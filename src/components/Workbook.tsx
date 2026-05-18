@@ -1,11 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 
-const PW = 380;
-const PH = 540;
-const PD = 24;
-const CO = 6;
-const SW = 32;
+const PW = 380; // Page Width
+const PH = 540; // Page Height
+const PD = 24;  // Page Depth (Thickness of the book block)
+const CO = 6;   // Cover Overhang
 
 interface PageContent {
   chapterLabel: string;
@@ -21,10 +20,8 @@ interface SheetData {
 
 const SHEETS: SheetData[] = [
   {
-    // Sheet 0: Front Cover
-    front: { chapterLabel: '', heading: '', body: [], pageNumber: 0 }, // Outside cover (handled by CoverDesign)
+    front: { chapterLabel: '', heading: '', body: [], pageNumber: 0 },
     back: {
-      // Inside front cover + Page 1
       chapterLabel: 'Welcome', heading: 'Introduction',
       body: [
         'Welcome to your MINE workbook. This is your personal space for discovery, reflection, and growth. Over the following pages, you will journey through a carefully crafted process.',
@@ -34,7 +31,6 @@ const SHEETS: SheetData[] = [
     },
   },
   {
-    // Sheet 1: Pages 2-3
     front: {
       chapterLabel: 'Getting Started', heading: 'How to Use This Book',
       body: [
@@ -53,7 +49,6 @@ const SHEETS: SheetData[] = [
     },
   },
   {
-    // Sheet 2: Pages 4-5
     front: {
       chapterLabel: 'Exercise', heading: 'Value Mapping',
       body: [
@@ -72,7 +67,6 @@ const SHEETS: SheetData[] = [
     },
   },
   {
-    // Sheet 3: Pages 6-7
     front: {
       chapterLabel: 'Exercise', heading: 'Boundary Setting',
       body: [
@@ -91,7 +85,6 @@ const SHEETS: SheetData[] = [
     },
   },
   {
-    // Sheet 4: Pages 8-9
     front: {
       chapterLabel: 'Exercise', heading: 'Vision Board',
       body: [
@@ -110,7 +103,6 @@ const SHEETS: SheetData[] = [
     },
   },
   {
-    // Sheet 5: Pages 10-11
     front: {
       chapterLabel: 'Exercise', heading: 'Habit Stacking',
       body: [
@@ -130,7 +122,6 @@ const SHEETS: SheetData[] = [
     },
   },
   {
-    // Sheet 6: Pages 12 + Inside back cover
     front: {
       chapterLabel: 'Reflection', heading: 'Closing Thoughts',
       body: [
@@ -139,64 +130,59 @@ const SHEETS: SheetData[] = [
         'Close this book knowing that the most important journey is the one within. You are already exactly where you need to be.',
       ], pageNumber: 12,
     },
-    back: { chapterLabel: '', heading: '', body: [], pageNumber: 0 }, // Inside back cover (blank)
+    back: { chapterLabel: '', heading: '', body: [], pageNumber: 0 },
   },
 ];
 
-const TOTAL_SHEETS = SHEETS.length;
-const TOTAL_SPREADS = TOTAL_SHEETS - 1; // Number of visible spreads (pairs of pages)
+const TOTAL_SPREADS = SHEETS.length; 
 
 type BookState = 'closed' | 'opening' | 'open' | 'flipping-forward' | 'flipping-back' | 'closing';
 
 /* ============================================================
    PAGE CONTENT VIEW
    ============================================================ */
-function PageContentView({ content, isRightSide }: { content: PageContent; isRightSide?: boolean }) {
-  if (!content.heading && !content.chapterLabel) {
+function PageContentView({ content, isRightSide }: { content: PageContent | null; isRightSide?: boolean }) {
+  if (!content || (!content.heading && !content.chapterLabel && content.body.length === 0)) {
     return (
-      <div style={{ padding: '48px 40px', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F5F0E8' }}>
+      <div style={{ padding: '40px', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F5F0E8' }}>
         <div style={{ width: 60, height: 1, background: '#D5CDB8' }} />
       </div>
     );
   }
   return (
-    <div style={{ padding: isRightSide ? '48px 40px 48px 32px' : '48px 32px 48px 40px', height: '100%', display: 'flex', flexDirection: 'column', color: '#1A1A1A', background: '#F5F0E8' }}>
-      {content.chapterLabel && <div style={{ fontFamily: '"Inter",sans-serif', fontSize: 11, fontWeight: 500, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A97E', marginBottom: 12 }}>{content.chapterLabel}</div>}
-      {content.heading && <h2 style={{ fontFamily: '"Cormorant Garamond",Georgia,serif', fontSize: 28, fontWeight: 600, letterSpacing: '0.02em', color: '#1A1A1A', margin: '0 0 20px 0', lineHeight: 1.2 }}>{content.heading}</h2>}
-      <div style={{ width: 40, height: 1, background: '#D5CDB8', margin: '24px 0' }} />
-      {content.body.map((p, i) => <p key={i} style={{ fontFamily: '"Inter",sans-serif', fontSize: 14, lineHeight: 1.7, color: '#1A1A1A', margin: '0 0 16px 0' }}>{p}</p>)}
-      {content.pageNumber > 0 && <div style={{ marginTop: 'auto', textAlign: 'center', fontFamily: '"Cormorant Garamond",Georgia,serif', fontSize: 14, fontWeight: 500, letterSpacing: '0.05em', color: '#C8A97E', paddingTop: 20 }}>{content.pageNumber}</div>}
+    <div style={{ padding: isRightSide ? '40px 32px 40px 24px' : '40px 24px 40px 32px', height: '100%', display: 'flex', flexDirection: 'column', color: '#1A1A1A', background: '#F5F0E8' }}>
+      {content.chapterLabel && <div style={{ fontFamily: '"Inter",sans-serif', fontSize: 11, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A97E', marginBottom: 12 }}>{content.chapterLabel}</div>}
+      {content.heading && <h2 style={{ fontFamily: '"Cormorant Garamond",Georgia,serif', fontSize: 30, fontWeight: 600, letterSpacing: '0.02em', color: '#1A1A1A', margin: '0 0 20px 0', lineHeight: 1.1 }}>{content.heading}</h2>}
+      <div style={{ width: 40, height: 2, background: '#D5CDB8', margin: '20px 0 28px 0' }} />
+      {content.body.map((p, i) => <p key={i} style={{ fontFamily: '"Inter",sans-serif', fontSize: 15, lineHeight: 1.65, color: '#2A2A2A', margin: '0 0 16px 0' }}>{p}</p>)}
+      {content.pageNumber > 0 && <div style={{ marginTop: 'auto', textAlign: isRightSide ? 'right' : 'left', fontFamily: '"Cormorant Garamond",Georgia,serif', fontSize: 15, fontWeight: 600, color: '#C8A97E', paddingTop: 20 }}>{content.pageNumber}</div>}
     </div>
   );
 }
 
 /* ============================================================
-   COVER DESIGN
+   COVER DESIGNS
    ============================================================ */
 function CoverDesign() {
   return (
-    <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', borderRadius: 4, overflow: 'hidden', background: 'radial-gradient(ellipse at 50% 40%,#222 0%,#1A1A1A 70%)' }}>
-      <div style={{ position: 'absolute', inset: 16, borderRadius: 2, boxShadow: 'inset 2px 2px 4px rgba(0,0,0,0.5),inset -1px -1px 3px rgba(255,255,255,0.12),inset -2px -2px 4px rgba(0,0,0,0.5),inset 1px 1px 3px rgba(255,255,255,0.12)', pointerEvents: 'none' }} />
-      <div style={{ position: 'absolute', top: 20, left: 20, width: 12, height: 12, borderTop: '1px solid rgba(200,169,126,0.3)', borderLeft: '1px solid rgba(200,169,126,0.3)' }} />
-      <div style={{ position: 'absolute', top: 20, right: 20, width: 12, height: 12, borderTop: '1px solid rgba(200,169,126,0.3)', borderRight: '1px solid rgba(200,169,126,0.3)' }} />
-      <div style={{ position: 'absolute', bottom: 20, left: 20, width: 12, height: 12, borderBottom: '1px solid rgba(200,169,126,0.3)', borderLeft: '1px solid rgba(200,169,126,0.3)' }} />
-      <div style={{ position: 'absolute', bottom: 20, right: 20, width: 12, height: 12, borderBottom: '1px solid rgba(200,169,126,0.3)', borderRight: '1px solid rgba(200,169,126,0.3)' }} />
+    <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', background: 'radial-gradient(ellipse at 50% 40%,#222 0%,#1A1A1A 70%)' }}>
+      <div style={{ position: 'absolute', inset: 12, border: '1px solid rgba(200,169,126,0.15)', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', top: 20, left: 20, width: 12, height: 12, borderTop: '1px solid rgba(200,169,126,0.5)', borderLeft: '1px solid rgba(200,169,126,0.5)' }} />
+      <div style={{ position: 'absolute', top: 20, right: 20, width: 12, height: 12, borderTop: '1px solid rgba(200,169,126,0.5)', borderRight: '1px solid rgba(200,169,126,0.5)' }} />
+      <div style={{ position: 'absolute', bottom: 20, left: 20, width: 12, height: 12, borderBottom: '1px solid rgba(200,169,126,0.5)', borderLeft: '1px solid rgba(200,169,126,0.5)' }} />
+      <div style={{ position: 'absolute', bottom: 20, right: 20, width: 12, height: 12, borderBottom: '1px solid rgba(200,169,126,0.5)', borderRight: '1px solid rgba(200,169,126,0.5)' }} />
       <div style={{ position: 'absolute', top: '42%', left: '20%', right: '20%', height: 1, background: 'linear-gradient(90deg,transparent 0%,#C8A97E 20%,#C8A97E 80%,transparent 100%)' }} />
-      <div style={{ fontFamily: '"Cormorant Garamond",Georgia,serif', fontSize: 42, fontWeight: 700, letterSpacing: '0.15em', color: '#C8A97E', textTransform: 'uppercase', textShadow: '0 2px 8px rgba(200,169,126,0.25)', textAlign: 'center', position: 'absolute', top: '35%', left: 0, right: 0 }}>MINE</div>
-      <div style={{ fontFamily: '"Inter",sans-serif', fontSize: 12, fontWeight: 400, letterSpacing: '0.35em', color: '#6B6560', textTransform: 'uppercase', textAlign: 'center', position: 'absolute', top: '52%', left: 0, right: 0 }}>WORKBOOK</div>
+      <div style={{ fontFamily: '"Cormorant Garamond",Georgia,serif', fontSize: 48, fontWeight: 700, letterSpacing: '0.15em', color: '#C8A97E', textTransform: 'uppercase', textShadow: '0 2px 12px rgba(200,169,126,0.3)', textAlign: 'center', position: 'absolute', top: '34%', left: 0, right: 0 }}>MINE</div>
+      <div style={{ fontFamily: '"Inter",sans-serif', fontSize: 13, fontWeight: 500, letterSpacing: '0.35em', color: '#888078', textTransform: 'uppercase', textAlign: 'center', position: 'absolute', top: '52%', left: 0, right: 0 }}>WORKBOOK</div>
     </div>
   );
 }
 
 function BackCoverDesign() {
   return (
-    <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', borderRadius: 4, overflow: 'hidden', background: '#1A1A1A' }}>
-      <div style={{ position: 'absolute', inset: 16, borderRadius: 2, boxShadow: 'inset 2px 2px 4px rgba(0,0,0,0.5),inset -1px -1px 3px rgba(255,255,255,0.12)', pointerEvents: 'none' }} />
-      <div style={{ position: 'absolute', top: 20, left: 20, width: 12, height: 12, borderTop: '1px solid rgba(200,169,126,0.3)', borderLeft: '1px solid rgba(200,169,126,0.3)' }} />
-      <div style={{ position: 'absolute', top: 20, right: 20, width: 12, height: 12, borderTop: '1px solid rgba(200,169,126,0.3)', borderRight: '1px solid rgba(200,169,126,0.3)' }} />
-      <div style={{ position: 'absolute', bottom: 20, left: 20, width: 12, height: 12, borderBottom: '1px solid rgba(200,169,126,0.3)', borderLeft: '1px solid rgba(200,169,126,0.3)' }} />
-      <div style={{ position: 'absolute', bottom: 20, right: 20, width: 12, height: 12, borderBottom: '1px solid rgba(200,169,126,0.3)', borderRight: '1px solid rgba(200,169,126,0.3)' }} />
-      <div style={{ position: 'absolute', bottom: '15%', left: 0, right: 0, textAlign: 'center', fontFamily: '"Inter",sans-serif', fontSize: 10, letterSpacing: '0.3em', color: '#6B6560', textTransform: 'uppercase' }}>A Personal Journey</div>
+    <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', background: '#1A1A1A' }}>
+      <div style={{ position: 'absolute', inset: 12, border: '1px solid rgba(200,169,126,0.1)', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', bottom: '15%', left: 0, right: 0, textAlign: 'center', fontFamily: '"Inter",sans-serif', fontSize: 11, letterSpacing: '0.3em', color: '#6B6560', textTransform: 'uppercase' }}>A Personal Journey</div>
     </div>
   );
 }
@@ -207,77 +193,92 @@ function BackCoverDesign() {
 export default function Workbook() {
   const [bookState, setBookState] = useState<BookState>('closed');
   const [currentSpread, setCurrentSpread] = useState(0);
-  const [displayedLeftSpread, setDisplayedLeftSpread] = useState(0);
-  const [displayedRightSpread, setDisplayedRightSpread] = useState(0);
   const [hoverTilt, setHoverTilt] = useState({ x: 0, y: 0, active: false });
   const [animLock, setAnimLock] = useState(false);
-  const [showBookInterior, setShowBookInterior] = useState(false);
   const [flipAngle, setFlipAngle] = useState(0);
+  const [scale, setScale] = useState(1);
+  
   const viewportRef = useRef<HTMLDivElement>(null);
+  const touchStart = useRef<{ x: number, y: number } | null>(null);
+
+  /* ---- Data Mappers ---- */
+  const getLeftPage = useCallback((index: number) => index === 0 ? null : SHEETS[index].front, []);
+  const getRightPage = useCallback((index: number) => SHEETS[index].back, []);
+
+  /* ---- Responsive Scaling ---- */
+  useEffect(() => {
+    const handleResize = () => {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      // Calculate scale to fit open book (width * 2) + safe padding
+      const scaleW = vw / (PW * 2 + 40);
+      const scaleH = vh / (PH + 160); // Account for buttons/UI
+      setScale(Math.min(1, scaleW, scaleH));
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   /* ---- Actions ---- */
-  const openBook = () => {
+  const openBook = useCallback(() => {
     if (bookState !== 'closed' || animLock) return;
     setAnimLock(true);
     setBookState('opening');
-    setTimeout(() => { setBookState('open'); setAnimLock(false); setShowBookInterior(true); }, 900);
-  };
+    setTimeout(() => { setBookState('open'); setAnimLock(false); }, 900);
+  }, [bookState, animLock]);
 
-  const closeBook = () => {
+  const closeBook = useCallback(() => {
     if (bookState !== 'open' || animLock) return;
     setAnimLock(true);
-    setShowBookInterior(false);
     setBookState('closing');
     setTimeout(() => {
       setBookState('closed');
       setCurrentSpread(0);
-      setDisplayedLeftSpread(0);
-      setDisplayedRightSpread(0);
       setAnimLock(false);
-      setShowBookInterior(false);
     }, 900);
-  };
+  }, [bookState, animLock]);
 
-  const goNext = () => {
+  const goNext = useCallback(() => {
     if (bookState !== 'open' || animLock || currentSpread >= TOTAL_SPREADS - 1) return;
-    const nextSpread = currentSpread + 1;
     setAnimLock(true);
     setBookState('flipping-forward');
     setFlipAngle(0);
-    setDisplayedRightSpread(nextSpread);
-    window.requestAnimationFrame(() => setFlipAngle(-180));
-    window.setTimeout(() => {
-      setDisplayedLeftSpread(nextSpread);
-    }, 325);
+    
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => setFlipAngle(-180));
+    });
+
     setTimeout(() => {
-      setCurrentSpread(nextSpread);
+      setCurrentSpread(prev => prev + 1);
       setBookState('open');
       setAnimLock(false);
-    }, 650);
-  };
+    }, 600);
+  }, [bookState, animLock, currentSpread]);
 
-  const goPrev = () => {
+  const goPrev = useCallback(() => {
     if (bookState !== 'open' || animLock || currentSpread <= 0) return;
-    const prevSpread = currentSpread - 1;
     setAnimLock(true);
     setBookState('flipping-back');
-    setFlipAngle(0);
-    setDisplayedLeftSpread(prevSpread);
-    window.requestAnimationFrame(() => setFlipAngle(180));
-    window.setTimeout(() => {
-      setDisplayedRightSpread(prevSpread);
-    }, 325);
+    setFlipAngle(-180);
+    
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => setFlipAngle(0));
+    });
+
     setTimeout(() => {
-      setCurrentSpread(prevSpread);
+      setCurrentSpread(prev => prev - 1);
       setBookState('open');
       setAnimLock(false);
-    }, 650);
-  };
+    }, 600);
+  }, [bookState, animLock, currentSpread]);
 
-  /* ---- Hover tilt ---- */
+  /* ---- Touch & Hover Interactions ---- */
   useEffect(() => {
     const el = viewportRef.current;
     if (!el) return;
+
+    // Hover (Desktop Only)
     const onMove = (e: MouseEvent) => {
       if (bookState !== 'closed') return;
       const rect = el.getBoundingClientRect();
@@ -286,154 +287,280 @@ export default function Workbook() {
       setHoverTilt({ x: (e.clientX - cx) / (rect.width / 2), y: (e.clientY - cy) / (rect.height / 2), active: true });
     };
     const onLeave = () => setHoverTilt({ x: 0, y: 0, active: false });
+    
+    // Touch (Mobile Swipes)
+    const onTouchStart = (e: TouchEvent) => {
+      touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      if (!touchStart.current || animLock || bookState !== 'open') return;
+      const dx = e.changedTouches[0].clientX - touchStart.current.x;
+      const dy = e.changedTouches[0].clientY - touchStart.current.y;
+      
+      // Horizontal swipe to turn pages
+      if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) {
+        if (dx > 0) goPrev();
+        else goNext();
+      } 
+      // Vertical swipe (down) to close
+      else if (dy > 80 && Math.abs(dy) > Math.abs(dx)) {
+        closeBook();
+      }
+      touchStart.current = null;
+    };
+
     el.addEventListener('mousemove', onMove);
     el.addEventListener('mouseleave', onLeave);
-    return () => { el.removeEventListener('mousemove', onMove); el.removeEventListener('mouseleave', onLeave); };
-  }, [bookState]);
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchend', onTouchEnd, { passive: true });
+    
+    return () => { 
+      el.removeEventListener('mousemove', onMove); 
+      el.removeEventListener('mouseleave', onLeave); 
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [bookState, animLock, goNext, goPrev, closeBook]);
 
-  /* ---- Keyboard ---- */
+  /* ---- Keyboard Input ---- */
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (bookState !== 'open' || animLock) return;
       if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); goNext(); }
       else if (e.key === 'ArrowLeft') { e.preventDefault(); goPrev(); }
-      else if (e.key === 'Escape') { e.preventDefault(); closeBook(); }
+      else if (e.key === 'Escape' || e.key === 'ArrowDown') { e.preventDefault(); closeBook(); }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [bookState, animLock, currentSpread, goNext, goPrev, closeBook]);
+  }, [bookState, animLock, goNext, goPrev, closeBook]);
 
-  /* ---- Derived ---- */
-  const isOpen = bookState === 'open' || bookState.startsWith('flipping');
-  const isAnimating = bookState === 'opening' || bookState === 'closing' || bookState.startsWith('flipping');
-  const isClosed = bookState === 'closed';
-
-  /* ---- Book transform with hover ---- */
-  const bookTransform = isOpen || bookState.startsWith('flipping') || bookState === 'opening'
-    ? 'rotateX(2deg) scale(1)'
-    : `translateX(${-PW / 2}px) rotateX(8deg) scale(0.95)${hoverTilt.active ? ` rotateY(${hoverTilt.x * 8}deg) rotateX(${hoverTilt.y * -6}deg) translateZ(${Math.sqrt(hoverTilt.x ** 2 + hoverTilt.y ** 2) * 4}px)` : ''}`;
-
-  const coverRotation = isOpen || bookState === 'opening' || bookState.startsWith('flipping') ? -180 : 0;
-  const frontCoverZ = isClosed || bookState === 'opening' || bookState === 'closing' ? 100 : 20;
-  const frontCoverLeft = PW - CO;
-  const frontCoverVisible = bookState === 'closed' || bookState === 'opening' || bookState === 'closing';
-  const leftPageSpread = SHEETS[displayedLeftSpread + 1] ?? SHEETS[TOTAL_SHEETS - 1];
-  const rightPageSpread = SHEETS[displayedRightSpread + 1] ?? SHEETS[TOTAL_SHEETS - 1];
-  const activeSpread = SHEETS[currentSpread + 1] ?? SHEETS[TOTAL_SHEETS - 1];
-  const prevSpread = SHEETS[Math.max(currentSpread, 1)] ?? SHEETS[1];
-  const nextSpread = SHEETS[Math.min(currentSpread + 2, TOTAL_SHEETS - 1)] ?? SHEETS[TOTAL_SHEETS - 1];
+  /* ---- State Derived Variables ---- */
+  const isOpen = bookState !== 'closed' && bookState !== 'closing';
   const isFlippingForward = bookState === 'flipping-forward';
   const isFlippingBack = bookState === 'flipping-back';
+  const isFlipping = isFlippingForward || isFlippingBack;
+  
+  // Angle of the master cover and left base block
+  const coverAngle = isOpen ? -180 : 0;
+
+  // Determine what each static/flipping face should display
+  let baseRightSpreadIndex = currentSpread;
+  let baseLeftSpreadIndex = currentSpread;
+  let flipFrontIndex = currentSpread;
+  let flipBackIndex = currentSpread;
+
+  if (isFlippingForward) {
+    baseRightSpreadIndex = currentSpread + 1;
+    baseLeftSpreadIndex = currentSpread;
+    flipFrontIndex = currentSpread;
+    flipBackIndex = currentSpread + 1;
+  } else if (isFlippingBack) {
+    baseRightSpreadIndex = currentSpread;
+    baseLeftSpreadIndex = currentSpread - 1;
+    flipFrontIndex = currentSpread - 1;
+    flipBackIndex = currentSpread;
+  }
+
+  const rightPageContent = getRightPage(baseRightSpreadIndex);
+  const leftPageContent = getLeftPage(baseLeftSpreadIndex);
+  const flipFrontContent = isFlipping ? getRightPage(flipFrontIndex) : null;
+  const flipBackContent = isFlipping ? getLeftPage(flipBackIndex) : null;
+
+  /* ---- Transforms ---- */
+  // The center of the 3D space is scaled dynamically to fit all screen sizes
+  const closedTransform = `translateX(${-PW/2}px) rotateX(${25 - hoverTilt.y * 5}deg) rotateY(${-15 + hoverTilt.x * 5}deg) translateZ(30px)`;
+  const openTransform = `translateX(0px) rotateX(4deg) rotateY(0deg) translateZ(0px)`;
+  
+  // Apply both scale and translation
+  const bookTransform = `scale(${scale}) ${bookState === 'closed' || bookState === 'closing' ? closedTransform : openTransform}`;
 
   return (
-    <div ref={viewportRef} role="region" aria-label="MINE Workbook" aria-busy={isAnimating} style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', background: 'radial-gradient(ellipse at 50% 40%,#141218 0%,#0C0C0C 70%)', perspective: '2000px' }}>
+    <div ref={viewportRef} style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', background: 'radial-gradient(ellipse at 50% 40%,#1a181e 0%,#050505 80%)', perspective: '2000px', touchAction: 'none' }}>
+      
+      {/* 3D BOOK CONTAINER */}
+      <div style={{ 
+        position: 'relative', 
+        width: PW * 2, 
+        height: PH + CO * 2, 
+        transformStyle: 'preserve-3d', 
+        transform: bookTransform, 
+        transition: 'transform 900ms cubic-bezier(0.25, 1, 0.4, 1)', 
+        willChange: 'transform' 
+      }}>
 
-      {/* Book Assembly */}
-      <div style={{ position: 'relative', transformStyle: 'preserve-3d', width: PW * 2, height: PH, transition: 'transform 900ms cubic-bezier(0.25,1,0.5,1)', willChange: 'transform', transform: bookTransform }}>
+        {/* --- FLOOR SHADOW --- */}
+        <div style={{ 
+          position: 'absolute', left: PW, top: 0, width: PW, height: PH + CO * 2, 
+          background: 'radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0.5) 0%, transparent 75%)', 
+          transform: `translateZ(-60px) scale(${isOpen ? 1.1 : 1.3})`, 
+          transition: 'transform 900ms, width 900ms, left 900ms',
+          transformOrigin: 'left center',
+          pointerEvents: 'none' 
+        }} />
 
-        {/* Floor Shadow */}
-        <div style={{ position: 'absolute', width: PW * 2 + 40, height: PH + 40, left: -20, top: -20, background: 'radial-gradient(ellipse at 50% 50%,rgba(0,0,0,0.5) 0%,transparent 70%)', transform: 'translateY(30px) translateZ(-100px)', pointerEvents: 'none', opacity: 0.8 }} />
+        {/* --- BACK COVER --- */}
+        <div style={{ 
+          position: 'absolute', left: PW, top: 0, width: PW + CO, height: PH + CO * 2, 
+          transform: `translateZ(${-PD/2}px)`, 
+          borderRadius: '0 6px 6px 0', overflow: 'hidden', 
+          boxShadow: 'inset 2px 2px 10px rgba(0,0,0,0.8), 5px 5px 25px rgba(0,0,0,0.4)' 
+        }}>
+          <BackCoverDesign />
+        </div>
 
-        {/* Spine */}
-        <div style={{ position: 'absolute', left: -SW / 2, top: -CO, width: SW, height: PH + CO * 2, background: 'linear-gradient(90deg,#0a0a0a 0%,#111 30%,#1a1a1a 70%,#0a0a0a 100%)', transform: `translateX(${PW - SW / 2}px) rotateY(-90deg)`, transformStyle: 'preserve-3d', borderRadius: 2 }} />
+        {/* --- PAPER EDGES (Simulated Book Thickness) --- */}
+        <div style={{ 
+          position: 'absolute', left: PW, top: CO, width: PD - 4, height: PH, 
+          background: 'linear-gradient(90deg, #D5CDB8 0%, #F5F0E8 20%, #E8E0D0 80%, #D5CDB8 100%)', 
+          transformOrigin: 'left center', 
+          transform: `translateX(${PW}px) translateZ(${-PD/2 + 2}px) rotateY(90deg)` 
+        }} />
+        <div style={{ 
+          position: 'absolute', left: PW, top: CO, width: PW, height: PD - 4, 
+          background: 'linear-gradient(180deg, #D5CDB8 0%, #F5F0E8 20%, #E8E0D0 80%, #D5CDB8 100%)', 
+          transformOrigin: 'left top', 
+          transform: `translateZ(${-PD/2 + 2}px) rotateX(-90deg)` 
+        }} />
+        <div style={{ 
+          position: 'absolute', left: PW, top: CO, width: PW, height: PD - 4, 
+          background: 'linear-gradient(0deg, #D5CDB8 0%, #F5F0E8 20%, #E8E0D0 80%, #D5CDB8 100%)', 
+          transformOrigin: 'left top', 
+          transform: `translateY(${PH}px) translateZ(${-PD/2 + 2}px) rotateX(-90deg)` 
+        }} />
 
-        {showBookInterior && (
-          <>
-            {/* Back Cover (left side) */}
-            <div style={{ position: 'absolute', left: -CO, top: -CO, width: PW + CO, height: PH + CO * 2, transformStyle: 'preserve-3d', borderRadius: 4, transform: `translateZ(${-PD / 2 - 1}px)` }}>
-              <BackCoverDesign />
+        {/* --- BASE RIGHT PAGE --- */}
+        <div style={{ 
+          position: 'absolute', left: PW, top: CO, width: PW, height: PH, 
+          transform: `translateZ(8px)`, 
+          background: '#F5F0E8', 
+          boxShadow: 'inset 8px 0 20px rgba(0,0,0,0.05)',
+          overflow: 'hidden',
+          borderRadius: '0 2px 2px 0'
+        }}>
+          <PageContentView content={rightPageContent} isRightSide />
+          {/* Inner spine binding shadow */}
+          <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '24px', background: 'linear-gradient(90deg, rgba(0,0,0,0.12) 0%, transparent 100%)', pointerEvents: 'none' }} />
+        </div>
+
+        {/* --- BASE LEFT PAGE --- */}
+        <div style={{ 
+          position: 'absolute', left: PW, top: CO, width: PW, height: PH, 
+          transformOrigin: 'left center', 
+          transform: `translateZ(${isOpen ? 14 : 10}px) rotateY(${coverAngle}deg)`, 
+          transition: 'transform 900ms cubic-bezier(0.25, 1, 0.4, 1)', 
+          transformStyle: 'preserve-3d', 
+          pointerEvents: isOpen ? 'auto' : 'none'
+        }}>
+          <div style={{ 
+            position: 'absolute', inset: 0, backfaceVisibility: 'hidden', 
+            background: '#F5F0E8', 
+            boxShadow: 'inset -8px 0 20px rgba(0,0,0,0.05)',
+            transform: 'rotateY(-180deg)', 
+            overflow: 'hidden',
+            borderRadius: '2px 0 0 2px',
+            opacity: isOpen ? 1 : 0, 
+            transition: 'opacity 400ms'
+          }}>
+            <PageContentView content={leftPageContent} />
+            {/* Inner spine binding shadow */}
+            <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '24px', background: 'linear-gradient(-90deg, rgba(0,0,0,0.12) 0%, transparent 100%)', pointerEvents: 'none' }} />
+          </div>
+        </div>
+
+        {/* --- FLIPPING PAGE (Animated turn) --- */}
+        {isFlipping && (
+          <div style={{ 
+            position: 'absolute', left: PW, top: CO, width: PW, height: PH, 
+            transformOrigin: 'left center', 
+            transform: `translateZ(16px) rotateY(${flipAngle}deg)`, 
+            transition: 'transform 600ms cubic-bezier(0.4, 0.0, 0.2, 1)', 
+            transformStyle: 'preserve-3d', 
+            zIndex: 100,
+            pointerEvents: 'none'
+          }}>
+            {/* Front face of flipping leaf */}
+            <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', background: '#F5F0E8', boxShadow: 'inset 8px 0 20px rgba(0,0,0,0.05), 10px 0 20px rgba(0,0,0,0.1)', borderRadius: '0 2px 2px 0' }}>
+              <PageContentView content={flipFrontContent} isRightSide />
+              <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '24px', background: 'linear-gradient(90deg, rgba(0,0,0,0.12) 0%, transparent 100%)' }} />
             </div>
-
-            {/* Active spread only: prevent stale previous pages from stacking on top */}
-            <div style={{ position: 'absolute', left: 0, top: 0, width: PW, height: PH, borderRadius: 2, overflow: 'hidden', background: '#F5F0E8', boxShadow: 'inset 8px 0 20px rgba(0,0,0,0.06)', transform: `translateZ(${PD / 2 - 2}px)`, zIndex: 60, pointerEvents: isAnimating ? 'none' : 'auto' }}>
-              <PageContentView content={leftPageSpread.front} />
+            {/* Back face of flipping leaf */}
+            <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', background: '#F5F0E8', transform: 'rotateY(-180deg)', boxShadow: 'inset -8px 0 20px rgba(0,0,0,0.05), -10px 0 20px rgba(0,0,0,0.1)', borderRadius: '2px 0 0 2px' }}>
+              <PageContentView content={flipBackContent} />
+              <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '24px', background: 'linear-gradient(-90deg, rgba(0,0,0,0.12) 0%, transparent 100%)' }} />
             </div>
-            <div style={{ position: 'absolute', left: PW, top: 0, width: PW, height: PH, borderRadius: 2, overflow: 'hidden', background: '#F5F0E8', boxShadow: 'inset -8px 0 20px rgba(0,0,0,0.06)', transform: `translateZ(${PD / 2 - 2}px)`, zIndex: 60, pointerEvents: isAnimating ? 'none' : 'auto' }}>
-              <PageContentView content={rightPageSpread.back} isRightSide />
-              <div style={{ position: 'absolute', left: 0, top: 0, width: 2, height: '100%', background: 'linear-gradient(180deg,#E8E0D0 0%,#D5CDB8 50%,#E8E0D0 100%)' }} />
-            </div>
-
-            {isFlippingForward && (
-              <div style={{ position: 'absolute', left: PW, top: 0, width: PW, height: PH, transformOrigin: 'left center', transformStyle: 'preserve-3d', transform: `translateZ(${PD / 2 + 2}px) rotateY(${flipAngle}deg)`, transition: 'transform 650ms cubic-bezier(0.55,0,0.1,1)', zIndex: 90, pointerEvents: 'none' }}>
-                <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', borderRadius: 2, overflow: 'hidden', background: '#F5F0E8', boxShadow: 'inset -8px 0 20px rgba(0,0,0,0.08)' }}>
-                  <PageContentView content={activeSpread.back} isRightSide />
-                </div>
-                <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', borderRadius: 2, overflow: 'hidden', background: '#F5F0E8', boxShadow: 'inset 8px 0 20px rgba(0,0,0,0.08)' }}>
-                  <PageContentView content={nextSpread.front} />
-                </div>
-              </div>
-            )}
-
-            {isFlippingBack && (
-              <div style={{ position: 'absolute', left: 0, top: 0, width: PW, height: PH, transformOrigin: 'right center', transformStyle: 'preserve-3d', transform: `translateZ(${PD / 2 + 2}px) rotateY(${flipAngle}deg)`, transition: 'transform 650ms cubic-bezier(0.55,0,0.1,1)', zIndex: 90, pointerEvents: 'none' }}>
-                <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', borderRadius: 2, overflow: 'hidden', background: '#F5F0E8', boxShadow: 'inset 8px 0 20px rgba(0,0,0,0.08)' }}>
-                  <PageContentView content={activeSpread.front} />
-                </div>
-                <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', borderRadius: 2, overflow: 'hidden', background: '#F5F0E8', boxShadow: 'inset -8px 0 20px rgba(0,0,0,0.08)' }}>
-                  <PageContentView content={prevSpread.back} isRightSide />
-                </div>
-              </div>
-            )}
-          </>
+          </div>
         )}
 
-        {/* Front Cover */}
-        <div onClick={isClosed && !animLock ? openBook : undefined} 
+        {/* --- SPINE --- */}
+        <div style={{ 
+          position: 'absolute', left: PW, top: 0, width: PD, height: PH + CO * 2, 
+          transformOrigin: 'left center', 
+          transform: `translateZ(${PD/2}px) rotateY(-90deg)`, 
+          background: 'linear-gradient(90deg, #0a0a0a 0%, #222 30%, #1A1A1A 70%, #050505 100%)',
+          borderRight: '1px solid rgba(200,169,126,0.1)',
+          boxShadow: 'inset 0 0 10px rgba(0,0,0,0.5)'
+        }} />
+
+        {/* --- FRONT COVER --- */}
+        <div 
+          onClick={bookState === 'closed' && !animLock ? openBook : undefined}
           style={{ 
-            position: 'absolute', 
-            left: frontCoverLeft, 
-            top: -CO, 
-            width: PW + CO, 
-            height: PH + CO * 2, 
+            position: 'absolute', left: PW, top: 0, width: PW + CO, height: PH + CO * 2, 
             transformOrigin: 'left center', 
+            transform: `translateZ(${PD/2}px) rotateY(${coverAngle}deg)`, 
+            transition: 'transform 900ms cubic-bezier(0.25, 1, 0.4, 1)', 
             transformStyle: 'preserve-3d', 
-            borderRadius: 4, 
-            transform: `translateZ(${PD / 2 + 1}px) rotateY(${coverRotation}deg)`, 
-            transition: 'transform 900ms cubic-bezier(0.25,1,0.5,1), left 900ms cubic-bezier(0.25,1,0.5,1), opacity 220ms ease', 
-            willChange: 'transform', 
-            cursor: isClosed ? 'pointer' : 'default', 
-            pointerEvents: frontCoverVisible && !isAnimating ? 'auto' : 'none', 
-            zIndex: frontCoverZ,
-            opacity: frontCoverVisible ? 1 : 0
-          }}>
-          <CoverDesign />
-          {/* Inside front cover - only visible when cover is rotated open */}
-          <div style={{ 
-            position: 'absolute', 
-            inset: 0, 
-            backfaceVisibility: 'hidden', 
-            borderRadius: 4, 
-            overflow: 'hidden', 
-            background: '#F5F0E8', 
-            transform: 'rotateY(180deg)' 
-          }}>
-            <div style={{ position: 'absolute', inset: 0, background: '#F5F0E8' }} />
+            borderRadius: '0 6px 6px 0', 
+            cursor: bookState === 'closed' ? 'pointer' : 'default',
+            zIndex: 200
+        }}>
+          {/* Outside Front Cover */}
+          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', borderRadius: '0 6px 6px 0', overflow: 'hidden', boxShadow: bookState === 'closed' ? '8px 8px 25px rgba(0,0,0,0.5), inset 2px 2px 5px rgba(255,255,255,0.05)' : 'none' }}>
+            <CoverDesign />
+          </div>
+          {/* Inside Front Cover */}
+          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', background: '#111', borderRadius: '6px 0 0 6px', overflow: 'hidden' }}>
+            {/* Dark textured inside cover */}
+            <div style={{ position: 'absolute', inset: 12, border: '1px solid rgba(255,255,255,0.05)', background: '#161616' }} />
+            <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '30px', background: 'linear-gradient(-90deg, rgba(0,0,0,0.5) 0%, transparent 100%)' }} />
           </div>
         </div>
 
       </div>
 
-      {/* Nav Controls */}
-      <div style={{ display: 'flex', gap: 12, marginTop: 40, opacity: isOpen ? 1 : 0, transform: isOpen ? 'translateY(0)' : 'translateY(10px)', transition: 'opacity 400ms cubic-bezier(0.25,1,0.5,1) 200ms, transform 400ms cubic-bezier(0.25,1,0.5,1) 200ms', pointerEvents: isOpen ? 'all' : 'none' }}>
-        <button onClick={goPrev} disabled={currentSpread <= 0 || animLock} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.7)', fontFamily: '"Inter",sans-serif', fontSize: 13, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', padding: '10px 20px', borderRadius: 4, cursor: 'pointer', transition: 'all 300ms', opacity: currentSpread <= 0 || animLock ? 0.25 : 1, pointerEvents: currentSpread <= 0 || animLock ? 'none' : 'auto' }}>
-          <ChevronLeft size={16} /><span>Prev Page</span>
+      {/* --- UI CONTROLS --- */}
+      <div style={{ 
+        position: 'absolute', bottom: 32, left: 0, right: 0,
+        display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 16,
+        opacity: isOpen ? 1 : 0, 
+        transform: isOpen ? 'translateY(0)' : 'translateY(20px)', 
+        transition: 'all 500ms cubic-bezier(0.25, 1, 0.5, 1) 400ms', 
+        pointerEvents: isOpen ? 'all' : 'none',
+        zIndex: 1000
+      }}>
+        {/* Navigation Buttons are slightly larger for easier mobile tapping */}
+        <button onClick={goPrev} disabled={currentSpread <= 0 || animLock} aria-label="Previous Page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 48, height: 48, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#C8A97E', borderRadius: '50%', cursor: 'pointer', transition: 'all 200ms', opacity: currentSpread <= 0 || animLock ? 0.3 : 1, pointerEvents: currentSpread <= 0 || animLock ? 'none' : 'auto', backdropFilter: 'blur(8px)' }}>
+          <ChevronLeft size={24} strokeWidth={1.5} />
         </button>
-        <button onClick={closeBook} disabled={animLock} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.7)', fontFamily: '"Inter",sans-serif', fontSize: 13, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', padding: '10px 20px', borderRadius: 4, cursor: 'pointer', transition: 'all 300ms' }}>
-          <X size={16} /><span>Close Book</span>
+        
+        <button onClick={closeBook} disabled={animLock} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)', fontFamily: '"Inter",sans-serif', fontSize: 13, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', padding: '0 24px', height: 48, borderRadius: 24, cursor: 'pointer', transition: 'all 200ms', backdropFilter: 'blur(8px)' }}>
+          <X size={16} /><span>Close</span>
         </button>
-        <button onClick={goNext} disabled={currentSpread >= TOTAL_SPREADS - 1 || animLock} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.7)', fontFamily: '"Inter",sans-serif', fontSize: 13, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', padding: '10px 20px', borderRadius: 4, cursor: 'pointer', transition: 'all 300ms', opacity: currentSpread >= TOTAL_SPREADS - 1 || animLock ? 0.25 : 1, pointerEvents: currentSpread >= TOTAL_SPREADS - 1 || animLock ? 'none' : 'auto' }}>
-          <span>Next Page</span><ChevronRight size={16} />
+        
+        <button onClick={goNext} disabled={currentSpread >= TOTAL_SPREADS - 1 || animLock} aria-label="Next Page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 48, height: 48, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#C8A97E', borderRadius: '50%', cursor: 'pointer', transition: 'all 200ms', opacity: currentSpread >= TOTAL_SPREADS - 1 || animLock ? 0.3 : 1, pointerEvents: currentSpread >= TOTAL_SPREADS - 1 || animLock ? 'none' : 'auto', backdropFilter: 'blur(8px)' }}>
+          <ChevronRight size={24} strokeWidth={1.5} />
         </button>
       </div>
 
-      {/* Spread indicator */}
-      <div style={{ position: 'absolute', bottom: 24, left: '50%', transform: 'translateX(-50%)', fontFamily: '"Inter",sans-serif', fontSize: 12, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', opacity: isOpen ? 1 : 0, transition: 'opacity 400ms', pointerEvents: 'none' }}>
-        {isOpen ? `Spread ${currentSpread + 1} of ${TOTAL_SPREADS}` : ''}
+      {/* --- SPREAD INDICATOR --- */}
+      <div style={{ position: 'absolute', top: 32, left: '50%', transform: 'translateX(-50%)', fontFamily: '"Inter",sans-serif', fontSize: 12, letterSpacing: '0.15em', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', opacity: isOpen ? 1 : 0, transition: 'opacity 400ms', pointerEvents: 'none' }}>
+        {isOpen ? `${currentSpread + 1} / ${TOTAL_SPREADS}` : ''}
       </div>
 
-      {/* Click hint when closed */}
-      <div style={{ position: 'absolute', bottom: 80, left: '50%', transform: 'translateX(-50%)', fontFamily: '"Inter",sans-serif', fontSize: 12, letterSpacing: '0.15em', color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', opacity: isClosed ? 1 : 0, transition: 'opacity 600ms', pointerEvents: 'none' }}>
-        {isClosed ? 'Click to open' : ''}
+      {/* --- CLICK HINT WHEN CLOSED --- */}
+      <div style={{ position: 'absolute', bottom: 80, left: '50%', transform: 'translateX(-50%)', fontFamily: '"Inter",sans-serif', fontSize: 12, letterSpacing: '0.15em', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', opacity: bookState === 'closed' ? 1 : 0, transition: 'opacity 600ms', pointerEvents: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+        <span>Tap to Open</span>
+        <div style={{ width: 1, height: 20, background: 'linear-gradient(180deg, rgba(255,255,255,0.4) 0%, transparent 100%)' }} />
       </div>
     </div>
   );
